@@ -71,6 +71,10 @@ int sysctl_mptcp_checksum __read_mostly = 1;
 int sysctl_mptcp_debug __read_mostly;
 EXPORT_SYMBOL(sysctl_mptcp_debug);
 int sysctl_mptcp_syn_retries __read_mostly = 3;
+#if IS_ENABLED(CONFIG_MPTCP_RTT)
+u32 sysctl_mptcp_scheduler_optimizations_disabled __read_mostly = 0;
+EXPORT_SYMBOL(sysctl_mptcp_scheduler_optimizations_disabled);
+#endif
 
 bool mptcp_init_failed __read_mostly;
 
@@ -167,6 +171,24 @@ static struct ctl_table mptcp_table[] = {
 		.maxlen		= MPTCP_SCHED_NAME_MAX,
 		.proc_handler	= proc_mptcp_scheduler,
 	},
+#if IS_ENABLED(CONFIG_MPTCP_RTT)
+        {
+                .procname     = "mptcp_scheduler_optimizations_disabled",
+                .data         = &sysctl_mptcp_scheduler_optimizations_disabled,
+                .maxlen       = sizeof(u32),
+                .mode         = 0644,
+                .proc_handler = &proc_douintvec
+        },
+#endif
+#if IS_ENABLED(CONFIG_MPTCP_RATIO)
+        {
+                .procname     = "num_segments_flow_one",
+                .data         = &sysctl_num_segments_flow_one,
+                .maxlen       = sizeof(u32),
+                .mode         = 0644,
+                .proc_handler = &proc_douintvec
+        },
+#endif
 	{ }
 };
 
