@@ -346,6 +346,10 @@ struct mptcp_cb {
 	u32 orig_window_clamp;
 
 	struct tcp_info	*master_info;
+	
+    /* MPTCP_QUEUE_PROBE */
+    u32 cnt_in_order;
+    u32 cnt_out_of_order;
 };
 
 #define MPTCP_VERSION_0 0
@@ -461,6 +465,11 @@ extern bool mptcp_init_failed;
 /* MPTCP flags: TX only */
 #define MPTCPHDR_INF		0x08
 #define MPTCP_REINJECT		0x10 /* Did we reinject this segment? */
+
+#if IS_ENABLED(CONFIG_NET_MPTCP_QUEUE_PROBE)
+    #define MPTCP_RCV_QUEUE 0x00
+    #define MPTCP_OFO_QUEUE 0x01
+#endif
 
 struct mptcp_option {
 	__u8	kind;
@@ -662,6 +671,12 @@ extern int sysctl_mptcp_version;
 extern int sysctl_mptcp_checksum;
 extern int sysctl_mptcp_debug;
 extern int sysctl_mptcp_syn_retries;
+#if IS_ENABLED(CONFIG_MPTCP_RTT)
+extern u32 sysctl_mptcp_scheduler_optimizations_disabled;
+#endif
+#if IS_ENABLED(CONFIG_MPTCP_RATIO)
+extern u32 sysctl_num_segments_flow_one;
+#endif
 
 extern struct workqueue_struct *mptcp_wq;
 
@@ -738,6 +753,34 @@ enum
 	MPTCP_MIB_REMADDRTX,		/* Sent a REMOVE_ADDR */
 	__MPTCP_MIB_MAX
 };
+
+#if IS_ENABLED(CONFIG_NET_MPTCP_SCHED_PROBE)
+struct mptcp_sched_probe {
+        unsigned long id;
+        struct sock *sk;
+        bool selector_reject;
+        bool found_unused_reject;
+        bool def_unavailable;
+        bool temp_unavailable;
+	bool srtt_reject;
+        bool selected;
+        int split;
+        int skblen;
+        u32 tx_bytes;
+        u32 trans_start;
+};
+#endif /* CONFIG_NET_MPTCP_SCHED_PROBE */
+
+#if IS_ENABLED(CONFIG_NET_MPTCP_QUEUE_PROBE)
+struct mptcp_queue_probe {
+	u8 q_id;
+	struct tcp_sock *meta_tp;
+	u32 skb_seq;
+	u32 skb_end_seq;
+	u8 op_id;
+	u32 q_size;
+};
+#endif /* CONFIG_NET_MPTCP_QUEUE_PROBE */
 
 #define MPTCP_MIB_MAX __MPTCP_MIB_MAX
 struct mptcp_mib {
@@ -907,6 +950,14 @@ bool subflow_is_backup(const struct tcp_sock *tp);
 struct sock *get_available_subflow(struct sock *meta_sk, struct sk_buff *skb,
 				   bool zero_wnd_test);
 extern struct mptcp_sched_ops mptcp_sched_default;
+
+#if IS_ENABLED(CONFIG_NET_MPTCP_SCHED_PROBE)
+extern void mptcp_sched_probe_init(struct mptcp_sched_probe *sprobe);
+extern struct mptcp_sched_probe* mptcp_sched_probe_log_hook(struct mptcp_sched_probe* sprobe, bool selected, unsigned long sched_probe_id, struct sock *sk);
+#endif
+#if IS_ENABLED(CONFIG_NET_MPTCP_QUEUE_PROBE)
+extern struct mptcp_queue_probe* mptcp_queue_probe_log_hook(u8 q_id, struct tcp_sock *meta_tp, struct sk_buff *skb, u8 op_id);
+#endif
 
 /* Initializes function-pointers and MPTCP-flags */
 static inline void mptcp_init_tcp_sock(struct sock *sk)
