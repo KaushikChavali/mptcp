@@ -2029,6 +2029,10 @@ int tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonblock,
 	struct scm_timestamping tss;
 	bool has_tss = false;
 	bool has_cmsg;
+	
+#if IS_ENABLED(CONFIG_NET_MPTCP_QUEUE_PROBE)
+    struct sk_buff *skb_log;
+#endif
 
 	if (unlikely(flags & MSG_ERRQUEUE))
 		return inet_recv_error(sk, msg, len, addr_len);
@@ -2217,9 +2221,19 @@ int tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonblock,
 				if (!copied)
 					copied = -EFAULT;
 				break;
-			}
-		}
+			} else {
+                if (IS_ENABLED(CONFIG_NET_MPTCP_QUEUE_PROBE) && is_meta_sk(sk)) {
+                    skb_log = skb_clone(skb, GFP_ATOMIC);
 
+                    TCP_SKB_CB(skb_log)->seq += offset;
+                    TCP_SKB_CB(skb_log)->end_seq = TCP_SKB_CB(skb_log)->seq + used;
+                    mptcp_queue_probe_log_hook(MPTCP_RCV_QUEUE, mptcp_meta_tp(tcp_sk(sk)), skb_log, 1);
+
+                    kfree_skb(skb_log);
+                		}
+		    	}
+        	}	
+		
 		WRITE_ONCE(*seq, *seq + used);
 		copied += used;
 		len -= used;
